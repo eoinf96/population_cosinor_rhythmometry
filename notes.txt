@@ -1,0 +1,8 @@
+Need to significantly change the input data
+
+Chat chat get to offer a bunch if unit tests etc
+
+The idea is to have a single piece of code for one cosine and then another for multi component cosinor
+
+
+Could add period-gram stuff to work out the frequency present in the signal?
