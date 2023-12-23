@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.stats import f as fdist
 import matplotlib.pyplot as plt
+from statistical_tests import runsTest, zTest, andersonDarlingTest
 
 class MultiCosinorModel():
+    ## TODO: Add doc string
     def __init__(self, N_components = 2, alpha = 0.05):
         '''
         Class for a multi component cosinor
@@ -87,19 +89,36 @@ class MultiCosinorModel():
 
         self.set_params(M, beta, gamma)
 
-        if do_residual_tests:
-            self._residual_tests()
+        residuals = self.y - self.transform(self.t)
 
+        if do_residual_tests:
+            self._residual_tests(residuals)
 
         ## Check for outliers defined as errors significantly greater than 3 SD
         if remove_outliers:
             # Check if the data fits
             _, p = self.goodness_of_fit()
             if p > self.alpha:
-                residuals = self.y - self.transform(self.t)
+
                 ind_ignore = np.abs(residuals - np.mean(residuals)) > 3 * np.std(residuals)
                 if np.any(ind_ignore):
                     self.fit(self.t[~ind_ignore], self.y[~ind_ignore], period = period, remove_outliers = False)
+
+    def transform(self, t):
+        '''
+        Transform a new observation at a time point
+        '''
+        y_est = np.zeros_like(t) + self.M
+        for i_N in range(self.N_components):
+            y_est += self._cosinor_func(self.A[i_N], self.phi[i_N], self.tau[i_N], t)
+        return y_est
+
+    def fit_tranform(self,t, y, period = 24 * 3600, remove_outliers = False ):
+        '''
+        Fit to data and return the fitted points
+        '''
+        self.fit(t=t, y=y, period = period, remove_outliers = remove_outliers )
+        return self.transform(t)
 
     def _parse_t_y(self, t, y):
         # Remove NaN values from y and t
@@ -127,23 +146,10 @@ class MultiCosinorModel():
         i_max = np.argmax(y_est_1000)
         self.bathy = phase_1000[i_max]
 
-    def transform(self, t):
-        '''
-        Transform a new observation at a timepoint
-        '''
-        y_est = np.zeros_like(t) + self.M
-        for i_N in range(self.N_components):
-            y_est += self._cosinor_func(self.A[i_N], self.phi[i_N], self.tau[i_N], t)
-        return y_est
-
-    def fit_tranform(self,t, y, period = 24 * 3600, remove_outliers = False ):
-        self.fit(t=t, y=y, period = period, remove_outliers = remove_outliers )
-        return self.transform(t)
-
 
     def goodness_of_fit(self):
         '''
-        Compute the goodness of fit statistic
+        Compute the goodness of fit F-statistic
         '''
         p_num_params = 2 * self.N_components + 1
         y_est = self.transform(self.t)
@@ -155,15 +161,16 @@ class MultiCosinorModel():
 
         return F_statistic, p_zero_amp_rhythm
 
-    def _residual_tests(self):
-        residuals = y[non_nan_mask] - y_est[non_nan_mask]
-        if len(residuals) >= 4:
-            h_normality, p_normality = adtest(residuals)
-        else:
-            h_normality, p_normality = 1, 1
-            h_idependence, p_idependence = runstest(residuals)
-            h_mean, p_mean = ztest(residuals, 0, np.std(residuals))
-            residual_tests = np.array([p_normality, p_idependence, p_mean])
+    def _residual_tests(self, residuals):
+        '''
+        Test for normality, independence, and zero mean residuals.
+        '''
+        residuals = residuals[~np.isnan(residuals)]
+
+        h_normality, p_normality = andersonDarlingTest(residuals)
+        h_idependence, p_idependence = runsTest(residuals)
+        h_mean, p_mean = zTest(residuals, 0, np.std(residuals))
+        residual_tests = np.array([p_normality, p_idependence, p_mean])
 
         # else:
         #     residual_tests = np.zeros(3)
