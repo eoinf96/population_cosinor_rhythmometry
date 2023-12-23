@@ -1,1 +1,3 @@
-# population_cosinor_rhythmometry
+# Population Cosinor Based Rhythmometry
+
+Coming soon ...
